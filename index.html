@@ -126,8 +126,9 @@ const REGOF={};for(const k in REG)REG[k].split(' ').forEach(cc=>REGOF[cc]=k);
 function regionBonus(a,b){const x=REGOF[C[a].cc],y=REGOF[C[b].cc];
   if(!x||!y)return 1;if(x==y)return x=='EU'?1.3:x=='AS'?1.15:1.1;
   return (x=='EU'&&(y=='NA'||y=='GULF'))||(y=='EU'&&(x=='NA'||x=='GULF'))?1.2:1}
-function pairDemand(a,b,d,floor){return Math.max(floor||12,.0006*Math.sqrt(C[a].pop*C[b].pop)*Math.sqrt(C[a].app*C[b].app)*regionBonus(a,b)/(1+d/6000))}
+function pairDemand(a,b,d,floor){return Math.max(floor||12,ECON.dem*Math.sqrt(C[a].pop*C[b].pop)*Math.sqrt(C[a].app*C[b].app)*regionBonus(a,b)/(1+d/6000))}
 const appealText=c=>c.app>=1.8?'⭐⭐⭐ Iconic destination':c.app>=1.4?'⭐⭐ Very popular destination':c.app>=1.15?'⭐ Popular destination':c.app<.9?'Low tourism demand':'Standard demand';
+const ECON={fare0:65,fareKm:.15,cargo0:130,cargoKm:.55,shipF:1.25,fuel:2.0,crew:3.0,fixed:45,over:.002,fee:1.5,dem:.0005};
 const SEARCH=C.map(c=>(c.name+' '+c.country+' '+c.iata).toLowerCase());
 const TYPES=[
  // id,name,kind,cap,speed,range,price,burn kg/km,unlock lifetime revenue
@@ -152,7 +153,7 @@ const TYPES=[
  ['b77f','Boeing 777F','cargo',102,905,9100,42e6,7.4,600e6],
  ['b748f','Boeing 747-8F','cargo',134,910,8100,48e6,10,1e9],
 ].map(t=>({id:t[0],name:t[1],kind:t[2],cap:t[3],speed:t[4],range:t[5],price:t[6],burn:t[7],unlock:t[8],
-  hr:t[2]=='pax'?60+t[3]*3.5:200+t[3]*8, turn:t[2]=='pax'?.5+t[3]/250:.7+t[3]/150}));
+  hr:t[2]=='pax'?30+t[3]*3.5:200+t[3]*8, turn:t[2]=='pax'?.5+t[3]/250:.7+t[3]/150}));
 const SHAPE={ // length, wingspan, sweep, engines, prop  (px on the map)
  c208:[8,10,0,1,1],b1900:[9,11,0,2,1],atr72:[10,13,0,2,1],q400:[11,14,0,2,1],atrf:[10,13,0,2,1],
  crj9:[11,10,3,0,0],e175:[11,11,3,0,0],a220:[12,12,4,2,0],
@@ -189,10 +190,10 @@ function drawPlane(g,id,fill,k){
  ['ferry1','Coastal Ferry','ferry',200,35,1200,2.5e6,12,0,40,.35,2],
  ['ferry2','Fast Ferry (catamaran)','ferry',450,65,2000,8e6,40,3e6,45,.30,2.5],
  ['ferry3','RoPax Ferry','ferry',1200,40,3500,30e6,110,20e6,50,.28,4],
- ['cru1','Boutique Cruise Ship','cruise',600,34,20000,60e6,100,50e6,400,.45,10],
+ ['cru1','Boutique Cruise Ship','cruise',600,34,20000,60e6,100,50e6,560,.55,10],
  ['cru2','Cruise Ship','cruise',2400,38,20000,220e6,300,250e6,450,.50,12],
  ['cru3','Mega Cruise Ship','cruise',5400,40,20000,520e6,520,1e9,500,.55,14]
-].forEach(t=>TYPES.push({id:t[0],name:t[1],kind:'ship',sub:t[2],cap:t[3],speed:t[4],range:t[5],price:t[6],burn:t[7],unlock:t[8],fare0:t[9],fkm:t[10],turn:t[11],hr:t[2]=='ferry'?60+t[3]*.5:300+t[3]*.35}));
+].forEach(t=>TYPES.push({id:t[0],name:t[1],kind:'ship',sub:t[2],cap:t[3],speed:t[4],range:t[5],price:t[6],burn:t[7]*.6,unlock:t[8],fare0:t[9],fkm:t[10],turn:t[11],hr:t[2]=='ferry'?60+t[3]*.5:300+t[3]*.35}));
 const TY={};TYPES.forEach(t=>TY[t.id]=t);
 const maxShip=c=>c.pop<250e3?800:c.pop<1e6?2500:99999;
 const RIVALS=['Skyline Air','Pacifica Wings','EuroJet','Gulf Crown','Andes Air','Nordic Star'];
@@ -215,10 +216,10 @@ function gc(a,b,n){
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const pick=a=>a[Math.floor(Math.random()*a.length)];
 function maxCap(c,kind){return kind=='pax'?(c.pop<250e3?110:c.pop<600e3?240:c.pop<1.5e6?340:9999):(c.pop<250e3?10:c.pop<600e3?30:c.pop<1.5e6?60:9999)}
-function landingFee(c,t){return (S.lobbyUntil&&S.day<S.lobbyUntil?.75:1)*(60+160*Math.sqrt(c.pop/1e6))*(.5+t.cap/(t.kind=='cargo'?60:t.kind=='ship'?1500:200))}
+function landingFee(c,t){return ECON.fee*(S.lobbyUntil&&S.day<S.lobbyUntil?.75:1)*(60+160*Math.sqrt(c.pop/1e6))*(.5+t.cap/(t.kind=='cargo'?60:t.kind=='ship'?1500:200))}
 
 /* ===================== state ===================== */
-const VERSION='1.3.0',REPO='VirajSinghChadha/flight-economy',SAVE_VERSION=1;
+const VERSION='1.4.1',REPO='VirajSinghChadha/flight-economy',SAVE_VERSION=1;
 const SAVE='flightEconomy_save',LEGACY='runAnAirline_v2';
 let S;
 function newGame(){
@@ -267,7 +268,7 @@ function endTut(){$('#tut').style.display='none';try{localStorage.setItem('fes_t
 function mkpts(r){return gc(C[r.a],C[r.b],Math.max(16,Math.min(300,Math.round(r.dist/50))))}
 const routeOf=p=>S.routes.find(r=>r.id==p.route);
 const insure=()=>S.up.ins*.25;
-const fuelPrice=()=>1.2*S.fuel*(1-.08*S.up.hedge);
+const fuelPrice=()=>ECON.fuel*S.fuel*(1-.08*S.up.hedge);
 const fleetValue=()=>S.planes.reduce((a,p)=>a+TY[p.type].price*.8,0);
 const debt=()=>(S.loans||[]).reduce((a,l)=>a+l.bal,0);
 const netWorth=()=>S.cash+fleetValue()-debt();
@@ -278,8 +279,8 @@ const creditLeft=()=>Math.max(0,creditLimit()-debt());
 function loanRate(amt,term){return (cleanOK()?-.01:0)+.07+.03*term/365+.12*Math.min(1,(debt()+amt)/Math.max(1,companyValue()))}
 
 /* ===================== economics ===================== */
-function paxRef(r){return 90+.25*r.dist}
-function cargoRef(r){return 120+.5*r.dist}
+function paxRef(r){return ECON.fare0+ECON.fareKm*r.dist}
+function cargoRef(r){return ECON.cargo0+ECON.cargoKm*r.dist}
 function repF(){return .6+.8*Math.min(100,S.rep+S.up.lounge*5)/100}
 const strike=()=>(S.strikeUntil&&S.day<S.strikeUntil)||(S.cyberUntil&&S.day<S.cyberUntil);
 const boost=()=>(S.boostUntil&&S.day<S.boostUntil?1.3:1)*(S.leakUntil&&S.day<S.leakUntil?.9:1);
@@ -290,7 +291,7 @@ function rate(r,cargo){
   const m=effMult(r);
   if(cargo)return r.cb*Math.pow(1/m,1.5)*repF()*boost();
   return (r.base+(r.xfer||0))*Math.pow(1/m,1.8)*(.7+.5*S.svc/100)*repF()*boost()}
-function fareFor(t,r){return (t.kind=='ship'?t.fare0+t.fkm*r.dist:t.kind=='pax'?paxRef(r):cargoRef(r))*effMult(r)}
+function fareFor(t,r){return (t.kind=='ship'?(t.fare0+t.fkm*r.dist)*ECON.shipF:t.kind=='pax'?paxRef(r)*(1+1.2*(1-Math.min(1,t.cap/150))):cargoRef(r))*effMult(r)}
 function book(p,r,amt){p.profit+=amt;r.dayP+=amt;S.dayProfit+=amt;S.yearProfit+=amt}
 
 function stepPlane(p,h){
@@ -310,13 +311,14 @@ function stepPlane(p,h){
   }else if(p.state=='fly'){p.t+=h;if(p.t>=p.dur)arrive(p,r,T)}
 }
 function depart(p,r,T,pool,load){
+  if(r.contra&&T.kind=='cargo'&&contraRun(p,r,T))return;
   pool[p.dir]-=load;
   const wf=wxFactor(r),rev=load*fareFor(T,r)*(S.cartelUntil&&S.day<S.cartelUntil?1.08:1),dur=(r.dist/T.speed+.35)*wf;
-  const fuel=r.dist*T.burn*fuelPrice()*wf,crew=dur*(T.hr*2.2+T.price*.0002)*S.wage,svc=T.kind!='cargo'?load*(2+.25*S.svc):0,cost=fuel+crew+svc;
-  const oid=p.dir?r.b:r.a;addUse(oid,load*(T.kind=='cargo'?5:1));
+  const fuel=r.dist*T.burn*fuelPrice()*wf,crew=(dur*(T.hr*ECON.crew+T.price*(T.kind=='ship'?.00002:.0002))+(T.kind=='cargo'?T.cap*4:T.kind=='ship'?T.cap*.2:T.cap)*ECON.fixed)*S.wage,svc=T.kind!='cargo'?load*(2+.25*S.svc):0;let cost=fuel+crew+svc;
+  const fx=rev*fxRate(r);cost+=fx;const oid=p.dir?r.b:r.a;addUse(oid,load*(T.kind=='cargo'?5:1));
   const pen=rev*Math.min(.35,Math.max(0,apOver(oid)-1)*.35);if(pen>0)S.rep=Math.max(0,S.rep-.02);
   S.cash+=rev-cost-pen;book(p,r,rev-cost-pen);S.life+=rev;
-  p.fl={load,rev,fuel,crew,svc,pen};p.want=null;p.state='fly';p.t=0;p.dur=dur;p.cond=Math.max(0,(p.cond??100)-dur*(T.kind=='ship'?.06:.35)*(S.cornerUntil&&S.day<S.cornerUntil?1.5:1));
+  p.fl={load,rev,fuel,crew,svc,pen,fx};p.want=null;p.state='fly';p.t=0;p.dur=dur;p.cond=Math.max(0,(p.cond??100)-dur*(T.kind=='ship'?.06:.35)*(S.cornerUntil&&S.day<S.cornerUntil?1.5:1));
   if(p.cond<25&&Math.random()<.06*(S.cornerUntil&&S.day<S.cornerUntil?3:1))breakdown(p,r)}
 function breakdown(p,r){
   const T=TY[p.type],cost=T.price*.04*(1-insure());S.cash-=cost;book(p,r,-cost);
@@ -327,8 +329,8 @@ function arrive(p,r,T){
   const dest=C[p.dir?r.a:r.b],fee=landingFee(dest,T);addUse(p.dir?r.a:r.b,p.fl.load*(T.kind=='cargo'?5:1));
   S.cash-=fee;book(p,r,-fee);
   const f=p.fl,t=r.tot||(r.tot={rev:0,fuel:0,crew:0,svc:0,fee:0,n:0});
-  t.rev+=f.rev;t.fuel+=f.fuel;t.crew+=f.crew;t.svc+=f.svc;t.fee+=fee+(f.pen||0);t.n++;p.rev=(p.rev||0)+f.rev;
-  const pr=f.rev-f.fuel-f.crew-f.svc-fee-(f.pen||0);r.last={rev:f.rev,profit:pr,margin:f.rev?pr/f.rev:0,load:f.load/T.cap};
+  t.rev+=f.rev;t.fuel+=f.fuel;t.crew+=f.crew;t.svc+=f.svc;t.fee+=fee+(f.pen||0)+(f.fx||0);t.n++;p.rev=(p.rev||0)+f.rev;
+  const pr=f.rev-f.fuel-f.crew-f.svc-fee-(f.pen||0)-(f.fx||0);r.last={rev:f.rev,profit:pr,margin:f.rev?pr/f.rev:0,load:f.load/T.cap};
   S.st.flights++;if(T.kind!='cargo'){S.st.pax+=p.fl.load;S.yearPax+=p.fl.load}else S.st.tons+=p.fl.load;
   r.flown=(r.flown||0)+1;r.lf=(r.lf||0)*.9+.1*p.fl.load/T.cap;
   p.fl=null;p.want=null;p.dir^=1;p.state='turn';p.t=0}
@@ -432,7 +434,7 @@ function eventsTick(){
 function incident(){
   const k=Math.round(Math.max(40000,Math.abs(netWorth())*.02)/1000)*1000;
   const L=[
-   ['good',`💼 An investor backs your airline: +${fmt(k*2)}!`,()=>{S.cash+=k*2}],
+   ['good',`💼 An investor backs your airline: +${fmt(k*1.2)}!`,()=>{S.cash+=k*1.2}],
    ['good','🎉 Tourism boom! Demand +30% for 10 days.',()=>{S.boostUntil=S.day+10}],
    ['good','⛽ Oil prices tumble: fuel is 20% cheaper.',()=>{S.fuel=Math.max(.6,S.fuel*.8)}],
    ['good','🌟 A celebrity raves about your airline online: +3 reputation.',()=>addRep(3)],
@@ -490,6 +492,10 @@ function runSearch(){
     const ps=S.planes.filter(p=>(TY[p.type].name+' '+p.reg).toLowerCase().includes(q));
     if(ps.length)h+='<h4 style="margin:8px 0 4px">Your planes</h4>'+ps.map(p=>{const r=routeOf(p);return `<div class="card" style="padding:6px 9px"><div class="row"><span>${icon(TY[p.type])} ${TY[p.type].name} <span class="mut">${p.reg}${r?' · '+C[r.a].iata+'↔'+C[r.b].iata:' · no route'}</span></span><button onclick="tab='fleet';renderTabs();renderBody()">Fleet</button></div></div>`}).join('')}
   el.innerHTML=h}
+function setContra(id,on){const r=S.routes.find(x=>x.id==id);if(!r)return;
+  if(on&&!boardOK('start a narcotics distribution line'))return renderBody();
+  if(on&&S.sanctionUntil&&S.day<S.sanctionUntil){toast('Too hot right now: you are under sanctions.','warn');return renderBody()}
+  r.contra=on;if(on)toast(`Your freighters on this route will now move narcotics. Destination enforcement: ${Math.round(enforce(C[r.b].cc)*100)}%.`,'warn')}
 function startScenario(id){S.scn={id,start:S.day,base:{pax:S.st.pax,life:S.life,cancels:S.st.cancels}};renderBody()}
 function scenarioTick(){
   if(!S.scn)return;const sc=SCN.find(x=>x.id==S.scn.id);if(!sc){S.scn=null;return}
@@ -534,7 +540,7 @@ function suspendAffected(id){
 function dailyTick(){
   S.fuel=Math.max(.6,Math.min(1.8,S.fuel*(1+rnd(-.03,.03))));
   let over=0;
-  for(const p of S.planes){const T=TY[p.type];over+=T.price*(.0008+.0004*S.wage);
+  for(const p of S.planes){const T=TY[p.type];over+=T.price*(ECON.over+.0004*S.wage);
     if(p.state=='grounded'){const r=routeOf(p);if(r)over+=landingFee(C[r.a],T)*(1-insure())}}
   S.cash-=over;S.dayProfit-=over;S.yearProfit-=over;
   for(const l of S.loans){const int=l.bal*l.rate/365,prin=Math.min(l.bal,l.principal/l.term);
@@ -542,7 +548,7 @@ function dailyTick(){
   const done=S.loans.filter(l=>l.bal<1);if(done.length){S.loans=S.loans.filter(l=>l.bal>=1);news(`🏦 Loan fully repaid.`,'good')}
   if(S.cash<0){S.rep=Math.max(0,S.rep-.5);if(S.lastDay%10==0)news('⚠️ You are overdrawn! Reputation is suffering. Sell planes, cut costs or take a loan.','warn')}
   if(S.wage<1&&!strike()&&Math.random()<(1-S.wage)*.3){S.strikeUntil=S.day+rnd(2,5);news('✊ Staff strike over low pay! Flights are on hold until it is settled. Raise wages in Airline → Staff pay.','war')}
-  wxTick();dailyChallengeTick();scenarioTick();
+  fxTick();wxTick();dailyChallengeTick();scenarioTick();
   S.paxPrev=S.st.pax-S.paxMark;S.paxMark=S.st.pax;
   for(const id in S.ap){const a=S.ap[id];a.last=a.used;a.used=0}
   S.est=S.est*.8+S.dayProfit*.2;S.dayProfitShown=S.dayProfit;S.dayProfit=0;
@@ -575,6 +581,7 @@ function stepSim(h){
     const d=h/24,pr=rate(r,false)*d,cr=rate(r,true)*d;
     for(let i=0;i<2;i++){r.pool[i]=Math.min(Math.max(rate(r,false)*2,20),r.pool[i]+pr);r.cpool[i]=Math.min(Math.max(rate(r,true)*2,4),r.cpool[i]+cr)}}
   for(const p of S.planes)stepPlane(p,h);
+  if(S.planes.some(p=>p.dead)){S.planes=S.planes.filter(p=>!p.dead);recalcTransfers()}
   const fd=Math.floor(S.day);while(S.lastDay<fd){S.lastDay++;dailyTick()}}
 
 /* ===================== finance: IPO, shares, board ===================== */
@@ -676,7 +683,7 @@ const cleanDays=()=>S.lastDirty==null?S.lastDay:S.lastDay-S.lastDirty;
 const cleanOK=()=>cleanDays()>=60;
 const SHADY=['Untaxed goods','Counterfeit luxury goods','Smuggled electronics','Restricted exotic cargo','Unlicensed pharmaceuticals'];
 function newOffers(){const k=Math.max(80000,Math.abs(netWorth())*.015);
-  S.offers=Array.from({length:3},()=>{const risk=rnd(.15,.4);return {id:S.nid++,item:pick(SHADY),risk,pay:Math.round(k*rnd(1,2.5)*(1+risk*2)/1000)*1000}})}
+  S.offers=Array.from({length:3},()=>{const risk=rnd(.15,.4);return {id:S.nid++,item:pick(SHADY),risk,pay:Math.round(k*rnd(.8,1.8)*(1+risk*2)/1000)*1000}})}
 const SCAMS={pad:{n:'Pad an insurance claim',risk:.3},writeoff:{n:'Stage a write-off of an old aircraft (parked, nobody hurt)',risk:.45}};
 function scamTarget(){return S.planes.filter(p=>p.state!='fly'&&p.state!='repair').sort((a,b)=>(a.cond??100)-(b.cond??100))[0]}
 function scamRisk(k){return Math.round(Math.min(.9,SCAMS[k].risk*(1+S.heat*.35))*bribeF()*100)}
@@ -696,7 +703,7 @@ function scam(k){
 /* ---- more underworld / clean options ---- */
 const kk=()=>Math.max(80000,Math.abs(netWorth())*.015);
 const OPTS=[
- {id:'tax',n:'Hide profits offshore (tax evasion)',risk:.25,cd:20,gain:()=>Math.max(80000,S.est*10)},
+ {id:'tax',n:'Hide profits offshore (tax evasion)',risk:.25,cd:20,gain:()=>Math.max(60000,S.est*6)},
  {id:'books',n:'Cook the books before reporting (needs IPO)',risk:.3,cd:40,need:()=>S.ipo,gain:()=>0},
  {id:'cartel',n:'Fix fares with a rival (cartel): +8% revenue for 30 days',risk:.3,cd:45,gain:()=>0},
  {id:'corners',n:'Skip safety inspections for 30 days: pocket savings, more breakdowns',risk:.25,cd:40,gain:()=>Math.max(50000,S.planes.reduce((a,p)=>a+TY[p.type].price,0)*.006)},
@@ -726,6 +733,23 @@ function shadyOpt(id){
   if(id=='spy'){const v=S.rivals[0];S.cash+=gain;v.nw*=.98;v.hostile=Math.min(1,v.hostile+.2);news(`🕵️ Your agent stole ${v.n}'s trade secrets: +${fmt(gain)} in value for you.`,'good')}
   if(id=='lobby')S.lobbyUntil=S.day+60,news('🏛 Your lobbyists delivered: airport fees are 25% lower for 60 days.','good');
   renderBody()}
+/* ---- narcotics distribution (abstract game mechanic) ---- */
+const enforce=cc=>.3+.6*(((cc.charCodeAt(0)||65)*31+(cc.charCodeAt(1)||65)*17)%100)/100;
+function contraRun(p,r,T){
+  const dest=C[p.dir?r.a:r.b],risk=.012*enforce(dest.cc)*(1+S.heat*.35)*bribeF();
+  S.heat+=.05;S.lastDirty=S.lastDay;
+  if(Math.random()<risk){
+    const fine=Math.max(250000,(S.contraEarned||0)*1.5+netWorth()*.04);S.cash-=fine;p.dead=true;r.contra=false;
+    S.sanctionUntil=S.day+rnd(35,60);addRep(-25);S.contraEarned=0;S.heat=Math.max(S.heat,2);
+    if(S.ipo){S.ipo.sat=Math.max(0,S.ipo.sat-25);S.ipo.sent=Math.max(.7,S.ipo.sent-.15)}
+    news(`🚨 NARCOTICS BUST! Authorities in ${dest.country} raided your ${T.name} ${p.reg}. Aircraft seized, fine ${fmt(fine)}, reputation −25 and long sanctions. The route's smuggling was shut down.`,'war');return true}
+  const pay=T.cap*rnd(500,900)*(1+r.dist/8000)*(1+(S.heat>2?-.1:0));S.cash+=pay;book(p,r,pay);S.contraEarned=(S.contraEarned||0)+pay;S.contraTotal=(S.contraTotal||0)+pay;return false}
+/* ---- currency fees on international routes ---- */
+const fxOf=cc=>(S.fx&&S.fx[cc])||1;
+function fxRate(r){const a=C[r.a].cc,b=C[r.b].cc;if(a==b)return 0;
+  return Math.min(.09,(.012+.8*Math.abs(fxOf(a)-fxOf(b)))*(1-.3*(S.up.fxh||0)))}
+function fxTick(){S.fx=S.fx||{};for(const r of S.routes){for(const cc of [C[r.a].cc,C[r.b].cc])if(S.fx[cc]==null)S.fx[cc]=1}
+  for(const cc in S.fx)S.fx[cc]=Math.max(.8,Math.min(1.2,S.fx[cc]+(1-S.fx[cc])*.03+rnd(-.012,.012)))}
 const bribeF=()=>S.bribeUntil&&S.day<S.bribeUntil?.5:1;
 function bribe(){const c=Math.max(100000,netWorth()*.01);
   if(S.cash<c){toast('You need '+fmt(c)+'.','warn');return}if(S.bribeUntil&&S.day<S.bribeUntil){toast('Officials are already on your payroll.','warn');return}
@@ -958,6 +982,7 @@ function routeDialog(a,b){
   const sanc=S.sanctionUntil&&S.day<S.sanctionUntil;
   $('#mbox').innerHTML=`<div class="row"><h3 style="margin:0">${esc(A.name)} ↔ ${esc(B.name)}</h3><button onclick="closeModal()">✕</button></div>
    <p class="mut">${esc(A.name)}: ${appealText(A)}${A.port?' · ⚓ port':''}<br>${esc(B.name)}: ${appealText(B)}${B.port?' · ⚓ port':''}</p>
+   ${A.cc!=B.cc?`<p class="mut">🌐 International route: everything is in USD, so you pay currency conversion fees (about ${(.012*100).toFixed(1)}%+ of revenue, varying with exchange rates). Currency hedging in the Airline tab cuts them.</p>`:''}
    ${sanc?'<p class="bad">🚫 Your airline is under sanctions: you cannot open new routes right now.</p>':''}
    <div class="card"><div class="row"><h4>✈️ Air route · ${Math.round(gcd)} km</h4><button class="pri" ${sanc||has('air')||S.cash<feeAir||!airFits.length?'disabled':''} onclick="openRoute(${a},${b},'air')">${has('air')?'Already open':'Open ('+fmt(feeAir)+')'}</button></div>
      <div class="mut">Demand ~${Math.round(baseAir)}/day each way · suggested fare ${fmt(90+.25*gcd)} · closing costs ${fmt(feeAir*.25)}<br>Aircraft: ${airFits.filter(t=>t.kind=='pax').map(t=>t.name).join(', ')||'<span class="bad">none fit (too far / airports too small)</span>'}</div></div>
@@ -1042,15 +1067,16 @@ function renderBody(){
   if(tab=='routes'){
     h=`<div class="card mut">Click a city → <b>Start a route here</b> → click another. Routes cost money; then assign planes in Fleet.</div>`;
     h+=S.routes.map(r=>{const n=S.planes.filter(p=>p.route==r.id).length,ev=r.blocked&&S.events.find(e=>e.id==r.blocked.ev);
-      return `<div class="card"><div class="row"><h4 style="cursor:pointer" onclick="focus(C[${r.a}],2)">${r.mode=='sea'?'🚢':'✈️'} ${routeName(r)}</h4>${ev?`<span class="tag red">${r.blocked.kind} closed</span>`:''}</div>
+      return `<div class="card"><div class="row"><h4 style="cursor:pointer" onclick="focus(C[${r.a}],2)">${r.mode=='sea'?'🚢':'✈️'} ${routeName(r)}${C[r.a].cc!=C[r.b].cc?` <span class="tag" title="All your money is in USD, so flights between countries pay currency conversion fees that move with exchange rates">🌐 ${(fxRate(r)*100).toFixed(1)}% fx</span>`:''}</h4>${ev?`<span class="tag red">${r.blocked.kind} closed</span>`:''}</div>
       <div class="mut">${Math.round(r.dist)} km · ${n} plane(s) · load ${Math.round((r.lf||0)*100)}%${r.wf>1.05?` · <span class="warn">weather +${Math.round((r.wf-1)*100)}% time/fuel</span>`:''}${r.xfer>1?` · +${Math.round(r.xfer)} transfer pax/day`:''} · <span class="${r.lastP<0?'bad':'good'}">${fmt(r.lastP)}/day</span></div>
       ${(()=>{const t=r.tot,L=r.last,pc=x=>Math.round(x*100)+'%',mg=t&&t.rev?(t.rev-t.fuel-t.crew-t.svc-t.fee)/t.rev:null;
        return L?`<div style="margin-top:4px">Last flight: ${fmt(L.rev)} revenue → <span class="${L.profit<0?'bad':'good'}">${fmt(L.profit)} (${pc(L.margin)} margin)</span> · ${pc(L.load)} full</div>
-       <div class="mut">Average margin <b class="${mg<0?'bad':'good'}">${pc(mg)}</b> over ${t.n} flights · costs as % of revenue: fuel ${pc(t.fuel/t.rev)}, crew ${pc(t.crew/t.rev)}, service ${pc(t.svc/t.rev)}, airport fees ${pc(t.fee/t.rev)}</div>`:'<div class="mut">No completed flights yet.</div>'})()}
+       <div class="mut">Average margin <b class="${mg<0?'bad':'good'}">${pc(mg)}</b> over ${t.n} flights · costs as % of revenue: fuel ${pc(t.fuel/t.rev)}, crew ${pc(t.crew/t.rev)}, service ${pc(t.svc/t.rev)}, fees (airport &amp; currency) ${pc(t.fee/t.rev)}</div>`:'<div class="mut">No completed flights yet.</div>'})()}
       <div class="row" style="margin-top:4px"><span class="mut">Fare ×<span id="fm${r.id}">${r.mult.toFixed(2)}</span></span><span class="mut">${r.mode=='sea'?'fare depends on vessel':fmt(paxRef(r)*effMult(r))+' / pax'}${saleOn(r)?' (sale)':''}</span></div>
       <input type="range" min="50" max="200" value="${r.mult*100}" oninput="S.routes.find(x=>x.id==${r.id}).mult=this.value/100;$('#fm${r.id}').textContent=(this.value/100).toFixed(2)">
       <div class="row" style="margin-top:5px;gap:4px">${saleOn(r)?`<span class="warn">🏷 SALE −${Math.round(r.sale.pct*100)}% · ${Math.ceil(r.sale.until-S.day)}d left</span>`:`<span><select id="sp${r.id}"><option value="10">10% off</option><option value="20">20% off</option><option value="30" selected>30% off</option><option value="50">50% off</option></select> <button onclick="startSale(${r.id})">Run 7-day sale (${fmt(saleCost(r))})</button></span>`}
-      <button class="dan" onclick="closeRoute(${r.id})">Close</button></div></div>`}).join('')||'<div class="mut">No routes yet.</div>'}
+      <button class="dan" onclick="closeRoute(${r.id})">Close</button></div>
+      ${S.planes.some(p=>p.route==r.id&&TY[p.type].kind=='cargo')?`<label class="mut" style="display:block;margin-top:5px"><input type="checkbox" ${r.contra?'checked':''} onchange="setContra(${r.id},this.checked)"> 🕶️ Narcotics distribution on this route <span class="bad">(illegal)</span></label>`:''}</div>`}).join('')||'<div class="mut">No routes yet.</div>'}
   else if(tab=='fleet'){
     h=`<div class="card"><div class="lg">${Object.values(PCOL).map(c=>`<span><i style="background:${c[0]}"></i>${c[1]}</span>`).join('')}</div><div class="mut" style="margin-top:3px">Bigger aircraft draw bigger on the map. Yellow ring = repair, red ring = grounded.</div></div>`;
     h+=S.planes.map(p=>{const T=TY[p.type],r=routeOf(p);
@@ -1066,7 +1092,7 @@ function renderBody(){
       <div class="mut">${t.cap}${k=='cargo'?' t payload':k=='ship'?' passengers':' seats'} · ${t.speed} km/h · range ${t.range.toLocaleString()} km</div>
       <div style="margin-top:4px">${un?`<button class="pri" ${S.cash<t.price?'disabled':''} onclick="buyPlane('${t.id}')">Buy</button>`:`<span class="mut">🔒 Unlocks at ${fmt(t.unlock)} lifetime revenue</span>`}</div></div>`}).join('')).join('')}
   else if(tab=='airline'){
-    const up=[['ins','Crisis insurance','Cuts refunds & airport fees by 25% per level',[1e5,4e5,1.5e6]],['lounge','Premium lounges','+5 reputation target per level',[2e5,1e6,4e6]],['hedge','Fuel hedging','−8% fuel cost per level',[3e5,1.5e6,6e6]]];
+    const up=[['fxh','Currency hedging','−30% currency fees per level on international routes',[3e5,1.2e6,5e6]],['ins','Crisis insurance','Cuts refunds & airport fees by 25% per level',[1e5,4e5,1.5e6]],['lounge','Premium lounges','+5 reputation target per level',[2e5,1e6,4e6]],['hedge','Fuel hedging','−8% fuel cost per level',[3e5,1.5e6,6e6]]];
     h=`<div class="card"><h4>🏷️ Company name</h4><input type="text" value="${esc(S.name)}" maxlength="30" oninput="S.name=this.value||'Your Airline'" style="width:100%"></div>
      <div class="card"><h4>👩‍✈️ Staff pay: ${Math.round(S.wage*100)}%</h4><div class="mut">Crew and ground staff wages. Pay more for happier staff, better reputation and no strikes. Pay less (under 100%) and strikes become likely.</div>
      <input type="range" min="80" max="150" step="5" value="${Math.round(S.wage*100)}" oninput="S.wage=this.value/100;this.previousElementSibling.previousElementSibling.textContent='👩‍✈️ Staff pay: '+this.value+'%'"></div>
@@ -1150,6 +1176,7 @@ function renderBody(){
       ${OPTS.map(o=>{const cd=S.cd&&S.cd[o.id]?Math.ceil(S.cd[o.id]-S.day):0,ok=!o.need||o.need(),cost=o.cost?o.cost():0;
       return `<div class="row" style="margin-top:5px"><span>${o.clean?'':'🕶️ '}${o.n}<br><span class="mut">${o.clean?'no risk':optRisk(o)+'% risk of being caught'}</span></span><button class="${o.clean?'':'dan'}" ${cd>0||!ok||S.cash<cost?'disabled':''} onclick="shadyOpt('${o.id}')">${cd>0?cd+'d':cost?fmt(cost):'Do it'}</button></div>`}).join('')}
       ${Object.keys(SCAMS).map(k=>`<div class="row" style="margin-top:5px"><span>🧾 ${SCAMS[k].n}<br><span class="mut">${scamRisk(k)}% risk · needs Crisis insurance${scamTarget()?'':' · no aircraft available'}</span></span><button class="dan" ${S.up.ins&&scamTarget()?'':'disabled'} onclick="scam('${k}')">Try it</button></div>`).join('')}
+      <div class="mut" style="margin-top:6px">☠️ Narcotics network: ${S.routes.filter(r=>r.contra).length} route(s) · earned so far ${fmt(S.contraTotal||0)}. Turn it on per cargo route in the Routes tab. Higher enforcement countries are riskier; every shipment adds heat.</div>
       <div style="margin-top:6px"><button class="dan" ${S.cash<Math.max(100000,netWorth()*.01)?'disabled':''} onclick="bribe()">💰 Bribe police &amp; officials · ${fmt(Math.max(100000,netWorth()*.01))}${S.bribeUntil&&S.day<S.bribeUntil?' (active '+Math.ceil(S.bribeUntil-S.day)+'d)':''}</button><div class="mut">Halves your chance of being caught for 30 days, but 15% of bribes get exposed.</div></div>
       <div class="mut" style="margin-top:4px">${eligibleCargo()?'Uses one of your cargo aircraft for 2 days.':'Needs a cargo aircraft. Or just stay clean and enjoy the perks.'} Getting caught: aircraft seized, big fine, sanctions, reputation crash.</div></div>
     <div class="card"><div class="row"><h4>🛡️ Security level ${sec}/3</h4>${sec<3?`<button ${S.cash<secC?'disabled':''} onclick="secUpgrade()">${fmt(secC)}</button>`:'<span class="good">MAX</span>'}</div>
@@ -1198,7 +1225,7 @@ document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{S.speed=+b.data
 if(!load()){S=newGame();initWx();news('Welcome! You have $1M. Buy a plane in the ☰ Menu → Shop, open a route between two cities (it costs money), then assign the plane in Fleet.')}
 else{
   const away=Math.min((Date.now()-S.lastSeen)/1000,1200);
-  if(away>30){const days=away/60,gain=Math.max(0,S.est)*days*.5;S.cash+=gain;S.day+=days;S.lastDay=Math.floor(S.day);
+  if(away>30){const days=away/60,gain=Math.max(0,S.est)*days*.25;S.cash+=gain;S.day+=days;S.lastDay=Math.floor(S.day);
     toast(`Welcome back! Your airline earned ${fmt(gain)} while you were away.`,'good')}
   S.loans=S.loans||[];S.routes.forEach(r=>{r.base=r.mode=='sea'?seaDemand(r.a,r.b,r.dist):pairDemand(r.a,r.b,r.dist);r.cb=r.mode=='sea'?0:Math.max(1,r.base*.12)});if(!S.wx||!S.wx.length)initWx();S.ap=S.ap||{};S.camp=S.camp||{};S.autoThr=S.autoThr||40;S.scnDone=S.scnDone||[];S.paxPrev=S.paxPrev||30;S.paxMark=S.paxMark||S.st.pax;S.planes.forEach(p=>{if(p.state=='fly'){p.state='turn';p.t=0;p.fl=null}});refreshBlocks()}
 document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',+x.dataset.sp==S.speed));
