@@ -218,7 +218,7 @@ function maxCap(c,kind){return kind=='pax'?(c.pop<250e3?110:c.pop<600e3?240:c.po
 function landingFee(c,t){return (60+160*Math.sqrt(c.pop/1e6))*(.5+t.cap/(t.kind=='cargo'?60:t.kind=='ship'?1500:200))}
 
 /* ===================== state ===================== */
-const VERSION='1.0.0',REPO='VirajSinghChadha/flight-economy',SAVE_VERSION=1;
+const VERSION='1.1.0',REPO='VirajSinghChadha/flight-economy',SAVE_VERSION=1;
 const SAVE='flightEconomy_save',LEGACY='runAnAirline_v2';
 let S;
 function newGame(){
@@ -226,7 +226,7 @@ function newGame(){
    st:{pax:0,tons:0,flights:0,cancels:0,refunds:0,fees:0},yearPax:0,yearProfit:0,dayProfit:0,est:0,
    up:{ins:0,lounge:0,hedge:0},loans:[],ap:{},autoSvc:false,autoThr:40,scn:null,scnDone:[],camp:{},goodwill:0,dc:null,saleCount:0,paxMark:0,paxPrev:30,events:[],news:[],awards:[],
    rivals:RIVALS.map(n=>({n,nw:rnd(5e6,30e6),g:rnd(.0012,.0028),rep:rnd(50,85),yp:0,ypax:0})),
-   wage:1,strikeUntil:0,cyberUntil:0,leakUntil:0,sanctionUntil:0,name:'Your Airline',ipo:null,evid:{},showRivals:true,fired:0,v:SAVE_VERSION,
+   wage:1,strikeUntil:0,cyberUntil:0,leakUntil:0,sanctionUntil:0,name:'Your Airline',ipo:null,evid:{},showRivals:true,fired:0,heat:0,lastDirty:null,offers:[],dirtyN:0,v:SAVE_VERSION,
    lastSeen:Date.now(),sel:null,from:null,speed:1}}
 let saveN=0;
 function save(){try{S.lastSeen=Date.now();const j=JSON.stringify(S,(k,v)=>k=='pts'?undefined:v);
@@ -275,7 +275,7 @@ const netWorth=()=>S.cash+fleetValue()-debt();
 const companyValue=()=>Math.max(0,S.cash)+fleetValue()+S.routes.length*50000;
 const creditLimit=()=>Math.max(250000,companyValue()*.6);
 const creditLeft=()=>Math.max(0,creditLimit()-debt());
-function loanRate(amt,term){return .07+.03*term/365+.12*Math.min(1,(debt()+amt)/Math.max(1,companyValue()))}
+function loanRate(amt,term){return (cleanOK()?-.01:0)+.07+.03*term/365+.12*Math.min(1,(debt()+amt)/Math.max(1,companyValue()))}
 
 /* ===================== economics ===================== */
 function paxRef(r){return 90+.25*r.dist}
@@ -549,8 +549,10 @@ function dailyTick(){
   S.routes.forEach(r=>{r.lastP=r.dayP;r.dayP=0});
   S.dc=newDaily();recalcTransfers();
   if(Math.random()<.09)incident();
-  const target=35+.55*S.svc+S.up.lounge*5+(S.goodwill||0)+(S.wage-1)*20;S.goodwill=(S.goodwill||0)*.985;S.rep=Math.max(0,Math.min(100,S.rep+(target-S.rep)*.03));
+  const target=35+.55*S.svc+S.up.lounge*5+(S.goodwill||0)+(S.wage-1)*20+(cleanOK()?3:0);S.goodwill=(S.goodwill||0)*.985;S.rep=Math.max(0,Math.min(100,S.rep+(target-S.rep)*.03));
   S.rivals.forEach(v=>{v.nw*=1+v.g/(1+v.nw/2e9)*rnd(.3,1.7);v.rep=Math.max(35,Math.min(95,v.rep+rnd(-1.5,1.5)));v.ypax+=v.nw*.02/365;v.yp+=v.nw*.0004*rnd(.5,1.5)});
+  S.heat=Math.max(0,S.heat-.02);if(S.lastDay%5==0)newOffers();
+  if(S.heat>1.2&&Math.random()<.03*S.heat*bribeF()){const fine=Math.max(60000,netWorth()*.02);S.cash-=fine;addRep(-3);news(`🔍 A customs audit dug into your records and fined you ${fmt(fine)}.`,'war')}
   rivalTick();ipoTick();
   eventsTick();
   if(S.lastDay%365==0&&S.lastDay>0)yearEnd();
@@ -668,6 +670,34 @@ function makeNemesis(old){
   v.routes=v.routes.filter(r=>r.planes.length);return v}
 const ATK={leak:{n:'Leak their documents',mult:1,ok:.7,caught:.25},smear:{n:'Smear campaign',mult:1,ok:.75,caught:.25},cyber:{n:'Cyber-attack',mult:2,ok:.6,caught:.35},sabotage:{n:'Sabotage an aircraft',mult:3,ok:.55,caught:.55}};
 const secLv=()=>S.up.sec||0;
+/* ---- underworld: shady cargo deals vs. staying clean ---- */
+const cleanDays=()=>S.lastDirty==null?S.lastDay:S.lastDay-S.lastDirty;
+const cleanOK=()=>cleanDays()>=60;
+const SHADY=['Untaxed goods','Counterfeit luxury goods','Smuggled electronics','Restricted exotic cargo','Unlicensed pharmaceuticals'];
+function newOffers(){const k=Math.max(80000,Math.abs(netWorth())*.015);
+  S.offers=Array.from({length:3},()=>{const risk=rnd(.15,.4);return {id:S.nid++,item:pick(SHADY),risk,pay:Math.round(k*rnd(1,2.5)*(1+risk*2)/1000)*1000}})}
+const bribeF=()=>S.bribeUntil&&S.day<S.bribeUntil?.5:1;
+function bribe(){const c=Math.max(100000,netWorth()*.01);
+  if(S.cash<c){toast('You need '+fmt(c)+'.','warn');return}if(S.bribeUntil&&S.day<S.bribeUntil){toast('Officials are already on your payroll.','warn');return}
+  if(!boardOK('pay "consultancy fees" to officials'))return;
+  S.cash-=c;S.bribeUntil=S.day+30;S.heat=Math.max(0,S.heat-.5);S.lastDirty=S.lastDay;
+  if(Math.random()<.15){const fine=c*rnd(4,8);S.cash-=fine;S.sanctionUntil=S.day+rnd(15,30);addRep(-10);
+    if(S.ipo){S.ipo.sat=Math.max(0,S.ipo.sat-15);S.ipo.sent=Math.max(.7,S.ipo.sent-.08)}
+    news(`🚨 Bribery scandal! A police officer talked: you were fined ${fmt(fine)}, reputation −10, and face sanctions.`,'war')}
+  else news(`🤝 You paid ${fmt(c)} to some well-placed officials. For 30 days, investigations into you are half as likely to catch anything.`,'')
+  renderBody()}
+function eligibleCargo(){return S.planes.find(p=>TY[p.type].kind=='cargo'&&p.state!='fly'&&p.state!='repair')}
+function shadyDeal(id){
+  const o=S.offers.find(x=>x.id==id),p=eligibleCargo();if(!o||!p){toast('You need an available cargo aircraft.','warn');return}
+  if(!boardOK('run a shady cargo deal'))return;
+  S.offers=S.offers.filter(x=>x!=o);p.state='repair';p.rep=48;p.fl=null;
+  const caught=Math.random()<Math.min(.9,o.risk*(1+S.heat*.35))*bribeF();
+  if(!caught){S.cash+=o.pay;S.heat+=.5;S.lastDirty=S.lastDay;S.dirtyN++;news(`🕶️ The run went smoothly: ${o.item} delivered for ${fmt(o.pay)}. Heat is rising — customs are watching.`,'good')}
+  else{const fine=o.pay*rnd(3,8)+netWorth()*.03,T=TY[p.type];S.cash-=fine;S.planes.splice(S.planes.indexOf(p),1);
+    S.sanctionUntil=S.day+rnd(25,45);addRep(-20);S.heat=Math.max(S.heat,1.5);S.lastDirty=S.lastDay;S.dirtyN++;
+    if(S.ipo){S.ipo.sat=Math.max(0,S.ipo.sat-20);S.ipo.sent=Math.max(.7,S.ipo.sent-.12)}recalcTransfers();
+    news(`🚨 BUSTED! Customs found ${o.item.toLowerCase()} on your ${T.name}. The aircraft was seized, fine ${fmt(fine)}, reputation −20 and sanctions for ~35 days.`,'war')}
+  renderBody()}
 function rivalAttack(v){
   const kinds=v.hostile>.5?['leak','smear','cyber','sabotage','sabotage']:['leak','smear','cyber'],k=pick(kinds);
   const cost=Math.max(40000,v.nw*.002)*ATK[k].mult;if(v.budget<cost)return;v.budget-=cost;
@@ -703,7 +733,7 @@ function dirty(i,k){
     else{const rr=v.routes.filter(r=>r.planes.length);if(rr.length){const r=pick(rr),t=r.planes.pop();v.nw-=TY[t].price*.8}v.nw*=.97;v.rep=Math.max(20,v.rep-6)}
     news(`🕶️ Your operation worked: ${A.n} against ${v.n}. (Cost ${fmt(cost)})`,'good')}
   else news(`🕶️ Your operation against ${v.n} failed. ${fmt(cost)} wasted.`,'warn');
-  if(Math.random()<A.caught*(k=='sabotage'?1:1)){
+  if(Math.random()<A.caught*bribeF()){
     const fine=Math.max(100000,netWorth()*(k=='sabotage'?rnd(.12,.25):rnd(.05,.15)));
     S.cash-=fine;S.sanctionUntil=S.day+rnd(20,40);addRep(-15);
     if(S.ipo){S.ipo.sent=Math.max(.7,S.ipo.sent-.1);S.ipo.sat=Math.max(0,S.ipo.sat-15)}
@@ -1064,7 +1094,12 @@ function renderBody(){
     setTimeout(()=>{if($('#lAmt'))loanQuote()},0)}
   else if(tab=='rivals'){
     const sec=secLv(),secC=[2e5,8e5,3e6][sec],sanc=S.sanctionUntil&&S.day<S.sanctionUntil;
-    h=`<div class="card"><div class="row"><h4>🛡️ Security level ${sec}/3</h4>${sec<3?`<button ${S.cash<secC?'disabled':''} onclick="secUpgrade()">${fmt(secC)}</button>`:'<span class="good">MAX</span>'}</div>
+    h=`<div class="card"><h4>${cleanOK()?'✅':'🕶️'} Underworld vs. clean record</h4>
+      <div class="mut">${cleanOK()?`<b class="good">Clean record: ${Math.floor(cleanDays())} days.</b> Perks: +3 reputation target and 1% cheaper loans.`:`Your record isn't clean (a clean streak of 60 days earns perks: +3 reputation target, cheaper loans). Streak: ${Math.floor(cleanDays())}/60 days.`} Heat: <b class="${S.heat>1?'bad':S.heat>.5?'warn':'good'}">${S.heat.toFixed(1)}</b> (raises the chance of being caught and of audits).</div>
+      ${(S.offers||[]).map(o=>`<div class="row" style="margin-top:5px"><span>${esc(o.item)}<br><span class="mut">${Math.round(Math.min(.9,o.risk*(1+S.heat*.35))*bribeF()*100)}% risk of being caught</span></span><button class="dan" ${eligibleCargo()?'':'disabled'} onclick="shadyDeal(${o.id})">Run it · ${fmt(o.pay)}</button></div>`).join('')||'<div class="mut">No offers right now.</div>'}
+      <div style="margin-top:6px"><button class="dan" ${S.cash<Math.max(100000,netWorth()*.01)?'disabled':''} onclick="bribe()">💰 Bribe police &amp; officials · ${fmt(Math.max(100000,netWorth()*.01))}${S.bribeUntil&&S.day<S.bribeUntil?' (active '+Math.ceil(S.bribeUntil-S.day)+'d)':''}</button><div class="mut">Halves your chance of being caught for 30 days, but 15% of bribes get exposed.</div></div>
+      <div class="mut" style="margin-top:4px">${eligibleCargo()?'Uses one of your cargo aircraft for 2 days.':'Needs a cargo aircraft. Or just stay clean and enjoy the perks.'} Getting caught: aircraft seized, big fine, sanctions, reputation crash.</div></div>
+    <div class="card"><div class="row"><h4>🛡️ Security level ${sec}/3</h4>${sec<3?`<button ${S.cash<secC?'disabled':''} onclick="secUpgrade()">${fmt(secC)}</button>`:'<span class="good">MAX</span>'}</div>
       <div class="mut">Rivals can hire operatives to leak documents, run smear campaigns, launch cyber-attacks, or sabotage aircraft. Better security catches more plots and reduces damage.</div>
       ${sanc?`<div class="bad" style="margin-top:4px">🚫 Under sanctions for ~${Math.ceil(S.sanctionUntil-S.day)} more days: no new routes or loans.</div>`:''}
       <label class="mut" style="display:block;margin-top:5px"><input type="checkbox" ${S.showRivals?'checked':''} onchange="S.showRivals=this.checked"> Show rival routes on the map</label></div>`;
